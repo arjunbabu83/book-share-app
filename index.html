@@ -66,6 +66,16 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    .request-form {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 5px;
+      display: none;
+    }
+    .request-form input {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -86,7 +96,8 @@
   <div id="bookList"></div>
 
   <script>
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbzhtJYODNiG0c9GOMaWJKu_arl5wMAMYUIApgEV88uK4bkWuAMs_vzcjoPgXl9pGTNe/exec'; // Replace with actual URL
+    // Replace with your deployed Google Apps Script web app URL
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbyU-l4wGje1bFFUzzw1xb6tIYaZ8zv36wQo_NkQr_nzFqvYsdNEymlfOhcBtEBFPLh4/exec'; // Update after deploying Code.gs
 
     const form = document.getElementById('bookForm');
     const bookList = document.getElementById('bookList');
@@ -94,56 +105,170 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(form);
-      const data = {};
-      formData.forEach((value, key) => data[key] = value);
-      data.status = 'Available'; // Default status
+      const data = {
+        action: 'share',
+        name: formData.get('name'),
+        title: formData.get('title'),
+        author: formData.get('author'),
+        description: formData.get('description'),
+        apartment: formData.get('apartment'),
+        imageUrl: formData.get('imageUrl'),
+        status: 'Available'
+      };
 
       try {
         const response = await fetch(scriptURL, {
           method: 'POST',
           body: JSON.stringify(data),
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          signal: AbortSignal.timeout(10000)
         });
-        const text = await response.text();
-        if (response.ok && text.includes("Success")) {
+        const result = await response.json();
+        console.log('Share book response:', result);
+        if (response.ok && result.status === 'success') {
           alert('✅ Book shared successfully!');
           form.reset();
           loadBooks();
         } else {
-          throw new Error(text);
+          throw new Error(result.message || `HTTP ${response.status}: Failed to share book`);
         }
       } catch (err) {
-        console.error(err);
-        alert('❌ Failed to share book. Please try again.');
+        console.error('Error sharing book:', err);
+        alert(`❌ Failed to share book: ${err.message}. Please try again.`);
       }
     });
 
+    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: AbortSignal.timeout(10000)
+          });
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Fetch failed with status ${response.status}: ${errorText}`);
+            throw new Error(`HTTP ${response.status}: ${errorText || 'Server error'}`);
+          }
+          return response;
+        } catch (err) {
+          console.warn(`Retrying fetch (${i + 1}/${retries}) due to error: ${err.message}`);
+          if (i < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw new Error(`Fetch failed after ${retries} attempts: ${err.message}`);
+          }
+        }
+      }
+    }
+
     async function loadBooks() {
+      bookList.innerHTML = '<p>Loading books...</p>';
       try {
-        const res = await fetch(scriptURL);
-        const books = await res.json();
+        const res = await fetchWithRetry(scriptURL, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors'
+        });
+        let books;
+        try {
+          books = await res.json();
+          console.log('Raw response:', books);
+        } catch (err) {
+          throw new Error(`Invalid JSON response: ${err.message}`);
+        }
+        if (!Array.isArray(books)) {
+          throw new Error(`Expected an array of books, got: ${JSON.stringify(books)}`);
+        }
+        if (books.length === 0) {
+          bookList.innerHTML = '<p>No books available yet.</p>';
+          return;
+        }
         bookList.innerHTML = '';
-        books.reverse().forEach(book => {
-          const status = book.Status || 'Available';
+        books.reverse().forEach((book, index) => {
+          const status = book.status || 'Available';
           const isAvailable = status.toLowerCase() === 'available';
           bookList.innerHTML += `
-            <div class="book">
-              <strong>${book['Book Title']}</strong> by ${book.Author}<br>
-              <em>Shared by:</em> ${book.Name} from ${book.Apartment}<br>
-              <p>${book.Description || ''}</p>
-              ${book['Image URL'] ? `<img src="${book['Image URL']}" alt="${book['Book Title']}">` : ''}
+            <div class="book" id="book-${index}">
+              <strong>${book.title}</strong> by ${book.author}<br>
+              <em>Shared by:</em> ${book.name} from ${book.apartment}<br>
+              <p>${book.description || ''}</p>
+              ${book.imageUrl ? `<img src="${book.imageUrl}" alt="${book.title}">` : ''}
               <p class="status">Status: ${status}</p>
-              ${isAvailable ? `<button class="request-btn" onclick="alert('Request sent to ${book.Name} at ${book.Apartment}')">Request This Book</button>` : ''}
+              ${book.requestername ? `<p><em>Requested by:</em> ${book.requestername} (${book.requesteremail})</p>` : ''}
+              ${isAvailable ? `
+                <button class="request-btn" onclick="showRequestForm(${index}, '${book.title.replace(/'/g, "\\'")}')">Request This Book</button>
+                <div class="request-form" id="request-form-${index}">
+                  <input type="text" id="requester-name-${index}" placeholder="Your Name" required />
+                  <input type="email" id="requester-email-${index}" placeholder="Your Email" required />
+                  <button onclick="submitRequest(${index}, '${book.title.replace(/'/g, "\\'")}')">Submit Request</button>
+                  <button onclick="hideRequestForm(${index})">Cancel</button>
+                </div>
+              ` : ''}
             </div>
           `;
         });
       } catch (err) {
         console.error('Error loading books:', err);
-        bookList.innerHTML = '<p>⚠️ Failed to load books.</p>';
+        bookList.innerHTML = `<p>⚠️ Failed to load books: ${err.message}. Please check the script URL or try again later.</p>`;
       }
     }
 
-    loadBooks();
+    function showRequestForm(index, title) {
+      document.getElementById(`request-form-${index}`).style.display = 'block';
+      document.getElementById(`book-${index}`).querySelector('.request-btn').style.display = 'none';
+    }
+
+    function hideRequestForm(index) {
+      document.getElementById(`request-form-${index}`).style.display = 'none';
+      document.getElementById(`book-${index}`).querySelector('.request-btn').style.display = 'block';
+    }
+
+    async function submitRequest(index, title) {
+      const requesterName = document.getElementById(`requester-name-${index}`).value;
+      const requesterEmail = document.getElementById(`requester-email-${index}`).value;
+      if (!requesterName || !requesterEmail) {
+        alert('❌ Please provide both name and email.');
+        return;
+      }
+
+      const data = {
+        action: 'request',
+        title: title,
+        requesterName: requesterName,
+        requesterEmail: requesterEmail
+      };
+
+      try {
+        const response = await fetch(scriptURL, {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          signal: AbortSignal.timeout(10000)
+        });
+        const result = await response.json();
+        console.log('Request book response:', result);
+        if (response.ok && result.status === 'success') {
+          alert('✅ Book request submitted successfully!');
+          hideRequestForm(index);
+          loadBooks();
+        } else {
+          throw new Error(result.message || `HTTP ${response.status}: Failed to submit request`);
+        }
+      } catch (err) {
+        console.error('Error requesting book:', err);
+        alert(`❌ Failed to submit request: ${err.message}. Please try again.`);
+      }
+    }
+
+    if (!scriptURL || scriptURL === 'https://script.google.com/macros/s/AKfycbyU-l4wGje1bFFUzzw1xb6tIYaZ8zv36wQo_NkQr_nzFqvYsdNEymlfOhcBtEBFPLh4/exec') {
+      bookList.innerHTML = '<p>⚠️ Error: Please configure the correct Google Apps Script web app URL.</p>';
+      console.error('Invalid scriptURL. Update the scriptURL constant with the deployed web app URL.');
+    } else {
+      loadBooks();
+    }
   </script>
 
 </body>
