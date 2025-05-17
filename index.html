@@ -80,7 +80,7 @@
 </head>
 <body>
 
-  <h1>📚 Community Book Sharing</h1>
+  <h1>📚 Radiant Shine Community Book Sharing</h1>
 
   <form id="bookForm">
     <input type="text" name="name" placeholder="Your Name" required />
@@ -97,7 +97,7 @@
 
   <script>
     // Replace with your deployed Google Apps Script web app URL
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbyU-l4wGje1bFFUzzw1xb6tIYaZ8zv36wQo_NkQr_nzFqvYsdNEymlfOhcBtEBFPLh4/exec'; // Update after deploying Code.gs
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxDbIpIqndUIBoyqxmL1UCCEz88e5va4A_NvfKVYkCYIyQ38NhTP9XORj2njaITpN4M/exec'; // Update after deploying Code.gs
 
     const form = document.getElementById('bookForm');
     const bookList = document.getElementById('bookList');
@@ -263,7 +263,7 @@
       }
     }
 
-    if (!scriptURL || scriptURL === 'https://script.google.com/macros/s/AKfycbyU-l4wGje1bFFUzzw1xb6tIYaZ8zv36wQo_NkQr_nzFqvYsdNEymlfOhcBtEBFPLh4/exec') {
+    if (!scriptURL || scriptURL === 'https://script.google.com/macros/s/AKfycbxDbIpIqndUIBoyqxmL1UCCEz88e5va4A_NvfKVYkCYIyQ38NhTP9XORj2njaITpN4M/exec') {
       bookList.innerHTML = '<p>⚠️ Error: Please configure the correct Google Apps Script web app URL.</p>';
       console.error('Invalid scriptURL. Update the scriptURL constant with the deployed web app URL.');
     } else {
