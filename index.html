@@ -37,6 +37,7 @@
       color: white;
       font-weight: bold;
       border: none;
+      cursor: pointer;
     }
     #bookList {
       max-width: 800px;
@@ -52,14 +53,13 @@
     .book img {
       max-width: 100%;
       height: auto;
-      display: block;
       margin-top: 0.5em;
     }
   </style>
 </head>
 <body>
 
-  <h1>Community Book Sharing</h1>
+  <h1>📚 Community Book Sharing</h1>
 
   <form id="bookForm">
     <input type="text" name="name" placeholder="Your Name" required />
@@ -72,51 +72,68 @@
   </form>
 
   <h2>Available Books</h2>
-  <div id="bookList"></div>
+  <div id="bookList">Loading books...</div>
 
   <script>
     const form = document.getElementById('bookForm');
     const bookList = document.getElementById('bookList');
 
-    const scriptURL = https://script.google.com/macros/s/AKfycbzhtJYODNiG0c9GOMaWJKu_arl5wMAMYUIApgEV88uK4bkWuAMs_vzcjoPgXl9pGTNe/exec; // Replace with your actual web app URL
+    // 🔁 Replace this with your actual Google Apps Script Web App URL (in quotes)
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbzhtJYODNiG0c9GOMaWJKu_arl5wMAMYUIApgEV88uK4bkWuAMs_vzcjoPgXl9pGTNe/exec';
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(form);
       const data = {};
-      formData.forEach((value, key) => (data[key] = value));
-      
-      const response = await fetch(scriptURL, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      formData.forEach((value, key) => data[key] = value);
 
-      if (response.ok) {
-        alert('Book shared successfully!');
-        form.reset();
-        loadBooks();
-      } else {
-        alert('Failed to share book.');
+      try {
+        const response = await fetch(scriptURL, {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          alert('✅ Book shared successfully!');
+          form.reset();
+          loadBooks();
+        } else {
+          throw new Error('Server error');
+        }
+      } catch (error) {
+        alert('❌ Failed to share book. Please try again.');
+        console.error(error);
       }
     });
 
     async function loadBooks() {
-      const res = await fetch(scriptURL);
-      const books = await res.json();
-      bookList.innerHTML = '';
-      books.reverse().forEach(book => {
-        bookList.innerHTML += `
-          <div class="book">
-            <strong>${book['Book Title']}</strong> by ${book.Author}<br>
-            <em>Shared by:</em> ${book.Name} from ${book.Apartment}<br>
-            <p>${book.Description || ''}</p>
-            ${book['Image URL'] ? `<img src="${book['Image URL']}" alt="${book['Book Title']}">` : ''}
-          </div>
-        `;
-      });
+      try {
+        const res = await fetch(scriptURL);
+        const books = await res.json();
+        bookList.innerHTML = '';
+
+        if (books.length === 0) {
+          bookList.innerHTML = '<p>No books shared yet. Be the first!</p>';
+        } else {
+          books.reverse().forEach(book => {
+            bookList.innerHTML += `
+              <div class="book">
+                <strong>${book['Book Title']}</strong> by ${book.Author}<br>
+                <em>Shared by:</em> ${book.Name} from ${book.Apartment}<br>
+                <p>${book.Description || ''}</p>
+                ${book['Image URL'] ? `<img src="${book['Image URL']}" alt="${book['Book Title']}">` : ''}
+              </div>
+            `;
+          });
+        }
+      } catch (error) {
+        bookList.innerHTML = '<p>❌ Failed to load books. Please check your internet or script URL.</p>';
+        console.error(error);
+      }
     }
 
+    // Initial book load
     loadBooks();
   </script>
 
