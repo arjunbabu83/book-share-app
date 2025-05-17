@@ -1,18 +1,157 @@
-async function loadBooks() {
-  const res = await fetch(scriptURL);
-  const books = await res.json();
-  bookList.innerHTML = '';
-  books.reverse().forEach(book => {
-    const status = book.Status || 'Available';
-    const isAvailable = status.toLowerCase() === 'available';
-    bookList.innerHTML += `
-      <div class="book" style="opacity: ${isAvailable ? 1 : 0.6};">
-        <strong>${book['Book Title']}</strong> by ${book.Author}<br>
-        <em>Shared by:</em> ${book.Name} from ${book.Apartment}<br>
-        <p>${book.Description || ''}</p>
-        ${book['Image URL'] ? `<img src="${book['Image URL']}" alt="${book['Book Title']}">` : ''}
-        <p><strong>Status:</strong> ${status}</p>
-      </div>
-    `;
-  });
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Community Book Sharing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 1em;
+      background: #f4f4f4;
+      color: #333;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    form {
+      max-width: 400px;
+      margin: auto;
+      background: white;
+      padding: 1em;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, textarea, button, select {
+      width: 100%;
+      padding: 10px;
+      margin: 0.5em 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #27ae60;
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #219150;
+    }
+    #bookList {
+      max-width: 800px;
+      margin: 2em auto;
+    }
+    .book {
+      background: white;
+      padding: 1em;
+      margin-bottom: 1em;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .book img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin-top: 0.5em;
+    }
+    .status {
+      font-weight: bold;
+      margin-top: 0.5em;
+    }
+    .status.available {
+      color: green;
+    }
+    .status.unavailable {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📚 Community Book Sharing</h1>
+
+  <form id="bookForm">
+    <input type="text" name="name" placeholder="Your Name" required />
+    <input type="text" name="title" placeholder="Book Title" required />
+    <input type="text" name="author" placeholder="Author" required />
+    <textarea name="description" placeholder="Brief Description (optional)"></textarea>
+    <input type="text" name="apartment" placeholder="Apartment Name" required />
+    <input type="url" name="imageUrl" placeholder="Image URL (optional)" />
+    <select name="status" required>
+      <option value="Available">Available</option>
+      <option value="Not Available">Not Available</option>
+    </select>
+    <button type="submit">Share Book</button>
+  </form>
+
+  <h2>Available Books</h2>
+  <div id="bookList"></div>
+
+  <script>
+    const form = document.getElementById('bookForm');
+    const bookList = document.getElementById('bookList');
+
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbzhtJYODNiG0c9GOMaWJKu_arl5wMAMYUIApgEV88uK4bkWuAMs_vzcjoPgXl9pGTNe/exec'; // ✅ Replace this with your deployed Google Apps Script URL
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const data = {};
+      formData.forEach((value, key) => (data[key] = value));
+
+      try {
+        const response = await fetch(scriptURL, {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          alert('✅ Book shared successfully!');
+          form.reset();
+          loadBooks();
+        } else {
+          alert('❌ Failed to share book. Please try again.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('❌ Error connecting to the server.');
+      }
+    });
+
+    async function loadBooks() {
+      try {
+        const res = await fetch(scriptURL);
+        const books = await res.json();
+        bookList.innerHTML = '';
+        books.reverse().forEach(book => {
+          const status = book.Status || 'Available';
+          const isAvailable = status.toLowerCase() === 'available';
+
+          bookList.innerHTML += `
+            <div class="book">
+              <strong>${book['Book Title']}</strong> by ${book.Author}<br>
+              <em>Shared by:</em> ${book.Name} from ${book.Apartment}<br>
+              <p>${book.Description || ''}</p>
+              ${book['Image URL'] ? `<img src="${book['Image URL']}" alt="${book['Book Title']}">` : ''}
+              <div class="status ${isAvailable ? 'available' : 'unavailable'}">
+                Status: ${status}
+              </div>
+            </div>
+          `;
+        });
+      } catch (error) {
+        bookList.innerHTML = `<p>⚠️ Failed to load books. Please try again later.</p>`;
+      }
+    }
+
+    loadBooks();
+  </script>
+
+</body>
+</html>
